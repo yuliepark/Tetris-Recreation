@@ -1,0 +1,312 @@
+import pygame
+import random
+import time
+
+pygame.init()
+pygame.font.init()
+screen = pygame.display.set_mode((600, 700))
+screen.fill((0,0,0))
+pygame.display.set_caption("TETRIS")
+pygame.display.flip()
+
+
+#Since we are now using images, we no longer need block colors.
+colors = {
+	"RED": (255, 0, 0),
+	"YELLOW": (255, 255, 0),
+	"BLUE": (0, 0, 255),
+	"GREEN": (0, 128, 0),
+	"PURPLE": (128, 0, 128),
+	"WHITE": (255, 255, 255),
+	"SILVER": (192, 192, 192),
+	"LIGHT PINK": (255, 182, 193),
+	"GRID_LINE": (192, 192, 192),  #Silver
+	"SCORE_RECT_OUTLINE": (0, 0, 128),  #Navy Blue
+	"SCORE": (255, 215, 0),  #Gold
+	"GAME_OVER": (255, 0, 0)  #Red
+	}
+
+score = 0
+
+
+class Board:
+	block_size = 20
+	board_width = 600
+	play_width = 300
+	board_height = 700
+	play_height = 500
+	number_of_rows = play_height // block_size
+	number_of_columns = play_width // block_size
+	top_left_x = 50
+	top_left_y = (board_height - play_height) // 2 + 20
+	global colors
+	global screen
+
+	def __init__(self):
+		for i in range(Board.number_of_rows + 1):
+			# draw the horizontal lines
+			pygame.draw.line(screen, colors["GRID_LINE"], (Board.top_left_x, Board.top_left_y + i*Board.block_size), (Board.top_left_x + Board.play_width, Board.top_left_y + i*Board.block_size)) # copied from online code: last 2 arguments = start_coord, end_coord
+		for j in range(Board.number_of_columns + 1):
+				# draw the vertical lines
+			pygame.draw.line(screen, colors["GRID_LINE"], (Board.top_left_x + j*Board.block_size, Board.top_left_y), (Board.top_left_x + j*Board.block_size, Board.top_left_y + Board.play_height)) # copied from online code: last 2 arguments = start_coord, end_coord
+
+
+	#def is_row_complete(self, row):
+		#for i in range(Board.block_size // 2 + Board.top_left_x, Board.top_left_x + Board.play_width, Board.block_size):
+			#print(screen.get_at((i, row)))
+			#if screen.get_at((i, row)) == (0,0,0):
+				#print("False")
+				#return False
+		#print("True")
+		#return True
+
+	"""def delete_row(self, row):
+		for block in all_blocks: # all_blocks is a list of all the current blocks on the board - see line 182
+			if block.rect.y == ((row - Board.block_size) // 2):
+				all_blocks.remove(block) # remove the block from the list and repeat this for the other 3 blocks of the shape
+
+	def move_down_rows(self, row):
+		if self.is_row_complete(row) == True: # aka a row is complete
+			self.delete_row(row) # call the delete_row function with the row output of is_row_complete function
+			all_blocks.update(0, 1) # move all the current blocks in the updated all_blocks down 1
+			all_blocks.draw(screen) # draw all the current blocks onto the screen again - ineffective
+			self.update_score(row)"""
+
+	def is_game_over(self):
+		for i in range(Board.top_left_x, Board.top_left_x + Board.play_width + Board.block_size, Board.block_size):
+			if screen.get_at((i + 1, Board.top_left_y + 1)) != (0,0,0): #may hav to do +2 or 3
+				print(i)
+				return True
+		return False
+
+	def set_score(self):
+		self.font = pygame.font.SysFont('Arial', 15)
+		score_region = pygame.Rect(410, Board.board_height / 2, 150, 50) # set the score region at the rightmost, center part of the game screen
+		pygame.draw.rect(screen, colors["SCORE_RECT_OUTLINE"], score_region) # draw the outline of this rectangular region in Gold
+
+	def update_score(self):
+		global score
+		score += 1
+		text_surface = my_font.render(("Score: " + str(score)), False, (255, 215, 0))
+		screen.blit(text_surface, (480, Board.board_height / 2 + 10))
+
+	def redraw(self):
+		screen.fill((0,0,0))
+		for i in range(Board.number_of_rows + 1):
+			# draw the horizontal lines
+			pygame.draw.line(screen, colors["GRID_LINE"], (Board.top_left_x, Board.top_left_y + i*Board.block_size), (Board.top_left_x + Board.play_width, Board.top_left_y + i*Board.block_size)) # copied from online code: last 2 arguments = start_coord, end_coord
+		for j in range(Board.number_of_columns + 1):
+				# draw the vertical lines
+			pygame.draw.line(screen, colors["GRID_LINE"], (Board.top_left_x + j*Board.block_size, Board.top_left_y), (Board.top_left_x + j*Board.block_size, Board.top_left_y + Board.play_height)) # copied from online code: last 2 arguments = start_coord, end_coord
+		score_region = pygame.Rect(420, Board.board_height / 2, 150, 50)
+		pygame.draw.rect(screen, colors["SCORE_RECT_OUTLINE"], score_region)
+		text_surface = my_font.render(("Score: " + str(score)), False, (255, 215, 0))
+		screen.blit(text_surface, (410, Board.board_height / 2 + 10))
+
+class Block(pygame.sprite.Sprite):
+	def __init__(self, x_coord, y_coord, color):
+		pygame.sprite.Sprite.__init__(self) # a required line for initiating the sprite object
+		global screen
+		self.x_coord = x_coord
+		self.y_coord = y_coord
+		self.color = color
+		self.block_size = Board.block_size
+		self.image = pygame.Surface((self.block_size, self.block_size)) # pull specific block image from computer for each shape class - see lines 130, 136, 142, 148, 154, 160, 166, 172
+		self.image.fill(self.color)
+		self.rect = self.image.get_rect() # creates a rectangular region for this sprite
+		self.rect.topleft = (x_coord, y_coord) 
+
+	def check_region(self, dx, dy): #take in shape use dict for x/y coord
+		global block1, block2, block3, block4
+		blocks = [block1, block2, block3, block4]
+		if pygame.sprite.spritecollideany(self, all_blocks) and pygame.sprite.spritecollideany(self, all_blocks) not in blocks: # check if block overlaps with any other block on the game board
+			print("sprite collide")
+			return False
+		elif self.x_coord + dx*Board.block_size < Board.top_left_x - Board.block_size or self.x_coord + dx*Board.block_size > Board.top_left_x + Board.play_width: # check left & right edges of game board
+			print("x coord check")
+			return False
+		elif self.y_coord + dy*Board.block_size > Board.top_left_y + Board.play_height: # check top $ bottom edges of game board
+			print("y coord check")
+			return False
+		else:
+			return True
+
+	#check two diff things if l/r then ignore. if bottom then stop
+
+	def update(self, dx, dy):
+		# if self.check_region(dx, dy) == True: # not working
+		# 	all_blocks.remove(self) # remove this block because we know we are going to change its coordinates since block.check_region is True
+		# 	shape.remove(self)
+		self.rect.x += dx*self.block_size
+		self.rect.y += dy*self.block_size
+		self.x_coord = self.rect.x # updated this block's current x_coord
+		self.y_coord = self.rect.y # updated this block's current y_coord
+			# all_blocks.add(self) # add this block to the all_blocks sprite group
+			# shape.add(self) # add this block to the shape sprite group so that:
+
+
+class I_Shape(Block):
+	init_coords = [[Board.play_width/2, 0], [Board.play_width/2, Board.block_size], [Board.play_width/2, Board.block_size*2], [Board.play_width/2, Board.block_size*3]]
+	color = colors["RED"]
+
+
+class J_Shape(Block):
+	init_coords = [[Board.play_width/2, Board.block_size*2], [Board.play_width/2 + Board.block_size, 0], [Board.play_width/2 + Board.block_size, Board.block_size], [Board.play_width/2 + Board.block_size, 2*Board.block_size]]
+	color = colors["YELLOW"]
+
+
+
+class Line_Shape(Block):
+	init_coords = [[Board.play_width/2 - 2*Board.block_size, 0], [Board.play_width/2 - Board.block_size, 0], [Board.play_width/2, 0], [Board.play_width/2 + Board.block_size, 0]]
+	color = colors["BLUE"]
+
+
+
+class T_Shape(Block):
+	init_coords = [[Board.play_width/2, 0], [Board.play_width/2 - Board.block_size, Board.block_size], [Board.play_width/2, Board.block_size], [Board.play_width/2 + Board.block_size, Board.block_size]]
+	color = colors["GREEN"]
+
+
+class S_Shape(Block):
+	init_coords = [[Board.play_width/2 - Board.block_size, Board.block_size], [Board.play_width/2, 0], [Board.play_width/2, Board.block_size], [Board.play_width/2 + Board.block_size, 0]]
+	color = colors["PURPLE"]
+
+
+
+class Reverse_S_Shape(Block):
+	init_coords = [[Board.play_width/2 - Board.block_size, 0], [Board.play_width/2, 0], [Board.play_width/2, Board.block_size], [Board.play_width/2 + Board.block_size, Board.block_size]]
+	color = colors["WHITE"]
+
+
+
+class L_Shape(Block):
+	init_coords = [[Board.play_width/2, 0], [Board.play_width/2, Board.block_size], [Board.play_width/2, 2*Board.block_size], [Board.play_width/2 + Board.block_size, 2*Board.block_size]]
+	color = colors["SILVER"]
+
+
+
+class Square_Shape(Block):
+	init_coords = [[Board.play_width/2, 0], [Board.play_width/2, Board.block_size], [Board.play_width/2 + Board.block_size, 0], [Board.play_width/2 + Board.block_size, Board.block_size]]
+	color = colors["LIGHT PINK"]
+
+
+def touch_bottom(shape_sprite_group):
+	for block in shape:
+		if (pygame.sprite.spritecollideany(block, all_blocks) != None) or (block.rect.bottom.y > Board.play_height) or not (Board.top_left_x <= block.rect.x <= Board.play_width):
+			return True
+	return False
+
+
+def move_down_shape(shape_sprite_group):
+	global hit_bottom
+	if touch_bottom(shape_sprite_group) == False:
+		print("Move down")
+		for block in shape_sprite_group:
+			block.update(0, 1)
+		shape_sprite_group.draw(screen)
+		pygame.display.flip()
+	else:
+		hit_bottom = True
+
+	
+
+def generate_new_shape(random_shape):
+	global block1, block2, block3, block4
+	block1 = Block(random_shape.init_coords[0][0], random_shape.init_coords[0][1], random_shape.color)
+	block2 = Block(random_shape.init_coords[1][0], random_shape.init_coords[1][1], random_shape.color)
+	block3 = Block(random_shape.init_coords[2][0], random_shape.init_coords[2][1], random_shape.color)
+	block4 = Block(random_shape.init_coords[3][0], random_shape.init_coords[3][1], random_shape.color)
+	shape = pygame.sprite.Group(block1,block2,block3,block4)
+	temporary_list = [block1, block2, block3, block4]
+	for i in range(4):
+		shape.add(temporary_list[i]) # add each block to shape - there isn't a more efficient way to do this unfortunately I think
+		all_blocks.add(temporary_list[i])
+	shape.draw(screen) # draw all four blocks at once on the game screen
+	pygame.display.flip()
+	return shape
+
+			
+
+# -------------------- Main Game Loop --------------------
+hit_bottom = True
+clock = pygame.time.Clock()
+FPS = 30
+
+
+MOVE_DOWN_SHAPE = pygame.USEREVENT + 1
+pygame.time.set_timer(MOVE_DOWN_SHAPE, 1000)
+
+all_blocks = pygame.sprite.Group()
+running = True
+list_of_shapes = [I_Shape, J_Shape, Line_Shape, T_Shape, S_Shape, Reverse_S_Shape, L_Shape, Square_Shape]
+
+game_board = Board() # initiate the game board
+game_board.set_score()
+my_font = pygame.font.SysFont('Arial', 30)
+text_surface = my_font.render("Score: " + str(score), False, colors["SCORE"])
+screen.blit(text_surface, (Board.top_left_x + Board.play_width + 80 + 30, Board.board_height / 2 + 20))
+
+game_over_text = pygame.font.SysFont('American Typewriter', 50)
+game_over_text_surface = game_over_text.render("GAME OVER", False, colors["GAME_OVER"])
+
+block1 = 0
+block2 = 0
+block3 = 0
+block4 = 0
+
+shape = generate_new_shape(random.choice(list_of_shapes))
+history = [shape]
+
+
+while running:
+
+	clock.tick(FPS)
+	# shape = pygame.sprite.Group()
+
+	for block in shape:
+		if not block.check_region(0, 1):
+			shape = generate_new_shape(random.choice(list_of_shapes))
+			game_board.update_score()
+			history.append(shape)
+			check_region = False
+			break
+
+	for event in pygame.event.get():
+		if event.type == pygame.QUIT:
+			pygame.quit()
+		elif event.type == pygame.KEYDOWN:
+			if event.key == pygame.K_LEFT:
+				[block.update(-1,0) for block in shape]
+				if len([block.check_region(-1,0) for block in shape if not block.check_region(-1,0)]):
+					[block.update(1,0) for block in shape]
+
+			if event.key == pygame.K_RIGHT:
+				[block.update(1,0) for block in shape]
+				if len([block.check_region(1,0) for block in shape if not block.check_region(1,0)]):
+					[block.update(-1,0) for block in shape]
+
+
+	[block.update(0,1) for block in shape]
+	if len([block.check_region(0,1) for block in shape if not block.check_region(0,1)]):
+		[block.update(0,-1) for block in shape]
+		if game_board.is_game_over():
+			print("Game over")
+			running = False
+			screen.blit(game_over_text_surface, (100, Board.board_height // 2))
+			pygame.display.flip()
+			time.sleep(0.7)
+			pygame.quit()
+		shape = generate_new_shape(random.choice(list_of_shapes))
+		game_board.update_score()
+		history.append(shape)
+		check_region = False
+
+	time.sleep(0.2)
+
+	game_board.redraw()
+	for shape in history:
+		shape.draw(screen)
+	pygame.display.flip()
+
+
+pygame.quit()
